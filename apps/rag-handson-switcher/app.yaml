@@ -1,0 +1,10 @@
+# 画面（UI）からデプロイするときの設定
+command: ["npm", "run", "start"]
+env:
+  # アプリのリソース「AI Search index」（リソースキー vector-search-index）から索引の名前を受け取る
+  - name: AI_SEARCH_INDEX
+    valueFrom: vector-search-index
+  # Scratch の回答に使う LLM（1-2 のエージェントと同じもの）
+  - name: LLM_ENDPOINT
+    value: databricks-claude-sonnet-4-5
+  # Genie Agent の ID は、アプリの画面（Managed タブ）で入力する

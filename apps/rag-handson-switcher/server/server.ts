@@ -2,10 +2,12 @@ import { createApp, getExecutionContext, server } from '@databricks/appkit';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-// app.yaml の env・valueFrom で、databricks.yml の変数とリソースから値が入る
+// app.yaml の env で値が入る。AI_SEARCH_INDEX はアプリのリソース（AI Search index、キー vector-search-index）から受け取る
 const AI_SEARCH_INDEX = process.env.AI_SEARCH_INDEX ?? '';
 const LLM_ENDPOINT = process.env.LLM_ENDPOINT ?? '';
+// Genie Agent の ID は、環境変数がなければ画面で利用者が入力したものを使う（本人の権限で呼ぶのでリソースは要らない）
 const GENIE_AGENT_ID = process.env.GENIE_AGENT_ID ?? '';
+const GENIE_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
 // 1-2 のエージェントと同じシステムプロンプト
 const SYSTEM_PROMPT = `あなたは社内文書について答えるアシスタントである。
@@ -17,6 +19,8 @@ const chatSchema = z.object({
   message: z.string().min(1),
   // Scratch: DurableAgentServer の session_id。Managed: Genie の conversation_id
   threadId: z.string().optional(),
+  // Managed: 画面で入力した Genie Agent の ID（環境変数 GENIE_AGENT_ID がないとき）
+  genieAgentId: z.string().regex(GENIE_ID_PATTERN).optional(),
 });
 
 type ChatReply = { text: string; threadId: string };
@@ -90,9 +94,9 @@ async function askScratch(message: string, threadId?: string): Promise<ChatReply
 }
 
 /** Managed：Genie Agent の Agent mode API を呼ぶ（SSE を最後まで読む） */
-async function askGenie(message: string, threadId?: string): Promise<ChatReply> {
+async function askGenie(agentId: string, message: string, threadId?: string): Promise<ChatReply> {
   const { host, headers } = await currentAuth();
-  const res = await fetch(`${host}/api/2.0/genie/agents/${GENIE_AGENT_ID}/responses`, {
+  const res = await fetch(`${host}/api/2.0/genie/agents/${agentId}/responses`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -139,7 +143,8 @@ createApp({
   onPluginsReady(appkit) {
     appkit.server.extend((app) => {
       app.get('/api/backends', (_req, res) => {
-        res.json({ scratch: Boolean(AI_SEARCH_INDEX && LLM_ENDPOINT), managed: Boolean(GENIE_AGENT_ID) });
+        // genieConfigured が false なら、画面で Genie Agent の URL か ID を入力してもらう
+        res.json({ scratch: Boolean(AI_SEARCH_INDEX && LLM_ENDPOINT), genieConfigured: Boolean(GENIE_AGENT_ID) });
       });
 
       app.post('/api/chat/:backend', async (req, res) => {
@@ -148,14 +153,19 @@ createApp({
           res.status(400).json({ error: '入力が正しくない' });
           return;
         }
-        const { message, threadId } = parsed.data;
+        const { message, threadId, genieAgentId } = parsed.data;
         try {
           if (req.params.backend === 'scratch') {
             // Scratch も質問したユーザー本人の権限（OBO）で索引を検索し、LLM を呼ぶ
             res.json(await appkit.asUser(req).run(() => askScratch(message, threadId)));
           } else if (req.params.backend === 'managed') {
             // 質問したユーザー本人の権限（OBO）で Genie Agent を呼ぶ
-            res.json(await appkit.asUser(req).run(() => askGenie(message, threadId)));
+            const agentId = GENIE_AGENT_ID || genieAgentId;
+            if (!agentId) {
+              res.status(400).json({ error: 'Genie Agent の URL か ID を入力する' });
+              return;
+            }
+            res.json(await appkit.asUser(req).run(() => askGenie(agentId, message, threadId)));
           } else {
             res.status(404).json({ error: '不明なバックエンド' });
           }

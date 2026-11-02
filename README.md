@@ -35,7 +35,7 @@ flowchart LR
 | `1-2_Scratch_RAGエージェントの構築とデプロイ.ipynb` | エージェントの試作、MLflow のトレースと評価、Agent Bricks CLI でのデプロイ | 45分 |
 | `2_Managed_Genie AgentとContent Search.ipynb` | Genie Agent の作成と Agent mode での質問（画面操作のガイド） | 30分 |
 | `agent/` | Agent Bricks のプロジェクト（1-2 でデプロイする） | — |
-| `apps/rag-handson-switcher/` | （任意）2つのエージェントを切り替えるチャットアプリ（AppKit） | 20分 |
+| `apps/rag-handson-switcher/` | （任意）2つのエージェントを切り替えるチャットアプリ（AppKit）。Databricks の画面からデプロイする | 20分 |
 
 ## 前提条件
 
@@ -82,18 +82,22 @@ flowchart LR
 - **Scratch**：1-1 の AI Search 索引をハイブリッド検索し、1-2 のエージェントと同じシステムプロンプト・同じ LLM で回答を作る（スコープ `vector-search`、`model-serving`）。アプリから別のアプリ（1-2 の Agent Runtime）を呼ぶと利用者のトークンが引き継がれないため、エージェントのアプリは呼ばない
 - **Managed**：Genie Agent の Agent mode API を呼ぶ（スコープ `genie`）
 
-ローカル PC でデプロイする（Node.js v22 以上、Databricks CLI が必要）。
+### デプロイの手順（Databricks の画面だけで行う）
 
-```bash
-cd apps/rag-handson-switcher
-npm install
-databricks bundle deploy -p <プロファイル> \
-  --var ai_search_index=<カタログ>.<自分のスキーマ>.docs_chunks_index \
-  --var genie_agent_id=<Genie Agent の ID>
-databricks bundle run app -p <プロファイル>
-```
+ローカル PC や Web Terminal は使わない。Git フォルダーに取り込んだ `apps/rag-handson-switcher` を、Databricks Apps の画面からデプロイする。前提として、1-1 で自分の索引を、2 で Genie Agent を作っておく。
 
-Genie Agent の ID は、Genie Agent の URL の `/genie/rooms/` の後ろの値である。初めて開くと、アプリが利用者に代わって Vector Search・Genie・Model Serving を使うことへの同意画面が出る。
+1. ワークスペースの右上のアプリの切り替え（点が9つのアイコン）→「Databricks Apps」を開き、左の「Apps」→「Create new app」→「Create a custom app」をクリックする（「コンピュート」→「Apps」タブの「Use the app switcher」からも開ける）
+2. **Name app**：「App name」に、ほかの参加者と重ならない名前（例 `switcher-<自分の名前>`、英小文字・数字・ハイフン）を入れ、「Next: Configure Git」をクリックする
+3. **Configure Git repository**：何も入れずに「Next: Configure」をクリックする（このリポジトリは private のため、Git から直接デプロイするにはアプリのサービスプリンシパルに Git の資格情報が要る。ここでは Git フォルダーからデプロイする）
+4. **Configure**：
+   - 「App resources」→「Add resource」→「AI Search index」を選び、自分の索引（`<カタログ>.<自分のスキーマ>.docs_chunks_index`）を入れる。権限は「Can select」、リソースキーは **`vector-search-index`** のままにする（`app.yaml` がこのキーで索引の名前を受け取る）
+   - 「User authorization」→「Add scope」で **`genie`**、**`model-serving`**、**`vector-search`** の3つを追加する
+   - 「Create app」をクリックする
+5. アプリのコンピュートが起動するまで 2〜3分待ち、右上の「Deploy」をクリックする。「Source code path」に Git フォルダーの中のアプリのフォルダー（例 `/Workspace/Users/<自分>/databricks-rag-handson/apps/rag-handson-switcher`）を入れ（フォルダーのアイコンから選んでもよい）、「Deploy」をクリックする。依存パッケージのインストールとビルドは Databricks が行う（数分）
+6. 状態が「Running」になったら、アプリの URL を開く。初回は、アプリが本人に代わって Vector Search・Genie・Model Serving を使うことへの同意画面が出るので「Authorize」をクリックする
+7. 「Managed」タブで、2 で作った Genie Agent の URL（ブラウザーのアドレス欄の `.../genie/rooms/<ID>`）を貼り付けて「保存」する。ID はブラウザーに保存される
+
+> コードを更新したとき（Git フォルダーで Pull したあと）は、アプリの画面で「Deploy」をもう一度クリックする。
 
 ## 後片付け
 
@@ -101,7 +105,7 @@ Genie Agent の ID は、Genie Agent の URL の `/genie/rooms/` の後ろの値
 
 | 対象 | 消し方 |
 |---|---|
-| 切り替えアプリ | `databricks bundle destroy -p <プロファイル>`（`apps/rag-handson-switcher` で実行） |
+| 切り替えアプリ | Databricks Apps でアプリを開き、「⋮」→「Delete」 |
 | Scratch のエージェント | Web Terminal で `agentbricks deployments delete agent-bricks-<AGENT_NAME> --delete-source` |
 | Genie Agent | Genie の一覧で該当の Genie Agent を削除する |
 | MLflow エクスペリメント | 「エクスペリメント」で `rag-handson-agent` を削除する |
