@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+dist/
+client/dist/
+.databricks/
+.env
+.env.local
+__pycache__/
+.ipynb_checkpoints/
+.venv/

@@ -1,0 +1,43 @@
+bundle:
+  name: rag-handson-switcher
+
+# デプロイ時に、自分の環境の値で上書きする:
+#   databricks bundle deploy --var scratch_agent_app=agent-bricks-rag-handson --var genie_agent_id=<Genie Agent の ID>
+variables:
+  scratch_agent_app:
+    description: Scratch パターンでデプロイしたエージェントのアプリ名（agent-bricks-<名前>）
+    default: agent-bricks-rag-handson
+  genie_agent_id:
+    description: Managed パターンで作った Genie Agent の ID（URL の /genie/rooms/ の後ろ）
+    default: ""
+
+resources:
+  apps:
+    app:
+      name: "rag-handson-switcher"
+      description: "Scratch エージェントと Managed の Genie Agent を切り替えるチャット"
+      source_code_path: ./
+
+      # Start the app automatically on deploy.
+      lifecycle:
+        started: true
+
+      # Managed（Genie Agent）は、質問したユーザー本人の権限で呼ぶ
+      user_api_scopes:
+        - genie
+
+      resources:
+        # Scratch のエージェント（別の Databricks App）は、このアプリのサービスプリンシパルで呼ぶ
+        - name: scratch-agent
+          app:
+            name: ${var.scratch_agent_app}
+            permission: CAN_USE
+        - name: genie-agent
+          genie_space:
+            name: rag-handson-genie
+            space_id: ${var.genie_agent_id}
+            permission: CAN_RUN
+
+targets:
+  default:
+    default: true

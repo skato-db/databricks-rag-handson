@@ -1,0 +1,12 @@
+schema_version = 1
+
+[agent]
+framework = "langgraph"
+server = "agentbricks"
+deployment_name = "rag-handson"
+
+# ハンズオンでは長期記憶（memory store）と会話履歴（session store）は使わない。
+# 使う場合は `agentbricks memory bind` / `agentbricks sessions bind` で追加する。
+
+[tracing]
+experiment_name = "/Shared/rag-handson-agent-traces"

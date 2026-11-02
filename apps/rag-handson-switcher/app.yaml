@@ -1,0 +1,6 @@
+command: ['npm', 'run', 'start']
+env:
+  - name: SCRATCH_AGENT_APP_NAME
+    valueFrom: scratch-agent
+  - name: GENIE_AGENT_ID
+    valueFrom: genie-agent
