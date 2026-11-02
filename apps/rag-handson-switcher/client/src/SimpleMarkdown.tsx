@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 // エージェントの回答を表示するための最小限の Markdown（見出し・箇条書き・太字・リンク・段落）
 function inline(text: string, keyBase: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /\*\*([^*]+)\*\*|\[([^\]]+)\]\((https?:[^)\s]+)\)/g;
+  // **太字**、[[1]](URL)（Genie の引用）、[テキスト](URL)
+  const pattern = /\*\*([^*]+)\*\*|\[\[(\d+)\]\]\((https?:[^)\s]+)\)|\[([^\]]+)\]\((https?:[^)\s]+)\)/g;
   let last = 0;
   let match: RegExpExecArray | null;
   let i = 0;
@@ -12,9 +13,10 @@ function inline(text: string, keyBase: string): ReactNode[] {
     if (match[1]) {
       nodes.push(<strong key={`${keyBase}-b${i}`}>{match[1]}</strong>);
     } else {
+      const [label, href] = match[2] ? [`[${match[2]}]`, match[3]] : [match[4], match[5]];
       nodes.push(
-        <a key={`${keyBase}-a${i}`} href={match[3]} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-          {match[2]}
+        <a key={`${keyBase}-a${i}`} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+          {label}
         </a>,
       );
     }

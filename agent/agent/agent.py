@@ -11,6 +11,7 @@ from langchain.agents.middleware.human_in_the_loop import HITLResponse
 from langgraph.types import Command
 from pydantic import TypeAdapter, ValidationError
 
+from agent.doc_search import doc_search_tool
 from agent.mcps import build_mcp_servers
 
 # Importing the tools package auto-registers every tool module.
@@ -115,6 +116,7 @@ async def create_agent_graph(
     """
     mcp = await mcp_tools(build_mcp_servers(), workspace_client_for=workspace_client_for)
     tools = [
+        doc_search_tool(workspace_client_for),  # 質問者本人の権限で索引を検索する
         *all_tools(),
         *memory_tools(actor),
         *genie_tools(workspace_client_for=workspace_client_for),

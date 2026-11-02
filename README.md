@@ -65,10 +65,10 @@ flowchart LR
 
 ## 切り替えチャットアプリ（任意）
 
-`apps/rag-handson-switcher` は AppKit（TypeScript/React）のアプリである。
+`apps/rag-handson-switcher` は AppKit（TypeScript/React）のアプリである。どちらのタブも、**質問したユーザー本人の権限**（user authorization）で呼ぶ。
 
-- **Scratch**：アプリのサービスプリンシパルで、1-2 でデプロイしたエージェントの `/api/invocations` を呼ぶ（`app` リソースの `CAN_USE`）
-- **Managed**：質問したユーザー本人の権限（user authorization、スコープ `genie`）で、Genie Agent の Agent mode API を呼ぶ
+- **Scratch**：1-1 の AI Search 索引をハイブリッド検索し、1-2 のエージェントと同じシステムプロンプト・同じ LLM で回答を作る（スコープ `vector-search`、`model-serving`）。アプリから別のアプリ（1-2 の Agent Runtime）を呼ぶと利用者のトークンが引き継がれないため、エージェントのアプリは呼ばない
+- **Managed**：Genie Agent の Agent mode API を呼ぶ（スコープ `genie`）
 
 ローカル PC でデプロイする（Node.js v22 以上、Databricks CLI が必要）。
 
@@ -76,12 +76,12 @@ flowchart LR
 cd apps/rag-handson-switcher
 npm install
 databricks bundle deploy -p <プロファイル> \
-  --var scratch_agent_app=agent-bricks-<AGENT_NAME> \
+  --var ai_search_index=<カタログ>.rag_handson.docs_chunks_index \
   --var genie_agent_id=<Genie Agent の ID>
 databricks bundle run app -p <プロファイル>
 ```
 
-Genie Agent の ID は、Genie Agent の URL の `/genie/rooms/` の後ろの値である。
+Genie Agent の ID は、Genie Agent の URL の `/genie/rooms/` の後ろの値である。初めて開くと、アプリが利用者に代わって Vector Search・Genie・Model Serving を使うことへの同意画面が出る。
 
 ## 後片付け
 
@@ -90,7 +90,7 @@ Genie Agent の ID は、Genie Agent の URL の `/genie/rooms/` の後ろの値
 | 対象 | 消し方 |
 |---|---|
 | 切り替えアプリ | `databricks bundle destroy -p <プロファイル>`（`apps/rag-handson-switcher` で実行） |
-| Scratch のエージェント | Web Terminal で `agentbricks deployments delete agent-bricks-<AGENT_NAME>` |
+| Scratch のエージェント | Web Terminal で `agentbricks deployments delete agent-bricks-<AGENT_NAME> --delete-source` |
 | Genie Agent | Genie の一覧で該当の Genie Agent を削除する |
 | AI Search の索引とエンドポイント | 索引はスキーマと一緒に消える。エンドポイントは「コンピュート」→「AI Search」で削除する（ほかの索引がないことを確かめる） |
 | MLflow エクスペリメント | 「エクスペリメント」で `rag-handson-agent` を削除する |

@@ -8,5 +8,11 @@ deployment_name = "rag-handson"
 # ハンズオンでは長期記憶（memory store）と会話履歴（session store）は使わない。
 # 使う場合は `agentbricks memory bind` / `agentbricks sessions bind` で追加する。
 
+# 検索ツールは、質問したユーザー本人の権限で AI Search の索引を検索する。
+# デプロイ時に、アプリのユーザー権限のスコープ（vector-search）が設定される。
+[auth.user]
+required = true
+additional_api_scopes = ["vector-search"]
+
 [tracing]
 experiment_name = "/Shared/rag-handson-agent-traces"

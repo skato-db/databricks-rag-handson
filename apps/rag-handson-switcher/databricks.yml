@@ -2,11 +2,14 @@ bundle:
   name: rag-handson-switcher
 
 # デプロイ時に、自分の環境の値で上書きする:
-#   databricks bundle deploy --var scratch_agent_app=agent-bricks-rag-handson --var genie_agent_id=<Genie Agent の ID>
+#   databricks bundle deploy --var ai_search_index=<catalog>.rag_handson.docs_chunks_index --var genie_agent_id=<Genie Agent の ID>
 variables:
-  scratch_agent_app:
-    description: Scratch パターンでデプロイしたエージェントのアプリ名（agent-bricks-<名前>）
-    default: agent-bricks-rag-handson
+  ai_search_index:
+    description: 1-1 で作った AI Search の索引（<catalog>.<schema>.<index>）
+    default: main.rag_handson.docs_chunks_index
+  llm_endpoint:
+    description: Scratch の回答に使う LLM（1-2 のエージェントと同じもの）
+    default: databricks-claude-sonnet-4-5
   genie_agent_id:
     description: Managed パターンで作った Genie Agent の ID（URL の /genie/rooms/ の後ろ）
     default: ""
@@ -15,23 +18,30 @@ resources:
   apps:
     app:
       name: "rag-handson-switcher"
-      description: "Scratch エージェントと Managed の Genie Agent を切り替えるチャット"
+      description: "Scratch（AI Search）と Managed（Genie Agent）を切り替えるチャット"
       source_code_path: ./
 
       # Start the app automatically on deploy.
       lifecycle:
         started: true
 
-      # Managed（Genie Agent）は、質問したユーザー本人の権限で呼ぶ
+      # Scratch（AI Search の検索と LLM）も Managed（Genie Agent）も、質問したユーザー本人の権限で呼ぶ
       user_api_scopes:
         - genie
+        - vector-search
+        - model-serving
+
+      config:
+        command: ["npm", "run", "start"]
+        env:
+          - name: AI_SEARCH_INDEX
+            value: ${var.ai_search_index}
+          - name: LLM_ENDPOINT
+            value: ${var.llm_endpoint}
+          - name: GENIE_AGENT_ID
+            value: ${var.genie_agent_id}
 
       resources:
-        # Scratch のエージェント（別の Databricks App）は、このアプリのサービスプリンシパルで呼ぶ
-        - name: scratch-agent
-          app:
-            name: ${var.scratch_agent_app}
-            permission: CAN_USE
         - name: genie-agent
           genie_space:
             name: rag-handson-genie
