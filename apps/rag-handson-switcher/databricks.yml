@@ -2,7 +2,7 @@ bundle:
   name: rag-handson-switcher
 
 # デプロイ時に、自分の環境の値で上書きする:
-#   databricks bundle deploy --var ai_search_index=<catalog>.rag_handson.docs_chunks_index --var genie_agent_id=<Genie Agent の ID>
+#   databricks bundle deploy --var ai_search_index=<catalog>.<your_schema>.docs_chunks_index --var genie_agent_id=<Genie Agent の ID>
 variables:
   ai_search_index:
     description: 1-1 で作った AI Search の索引（<catalog>.<schema>.<index>）

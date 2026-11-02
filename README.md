@@ -29,8 +29,9 @@ flowchart LR
 
 | パス | 内容 | 所要時間の目安 |
 |---|---|---|
-| `00_データ準備.ipynb` | カタログ（任意）・スキーマ・マネージドボリュームを作り、PDF を置く | 5分 |
-| `1-1_Scratch_パースとAI Search索引の作成.ipynb` | PDF のパース、チャンク化、AI Search の索引作成、ANN とハイブリッドの検索 | 30分 |
+| `00-0_代表者_共通エンドポイントの作成.ipynb` | **代表者だけが実行する**。全員で共有する AI Search エンドポイントを作り、参加者に権限を付ける | 10分 |
+| `00_データ準備.ipynb` | カタログ（任意）・自分のスキーマ・マネージドボリュームを作り、PDF を置く | 5分 |
+| `1-1_Scratch_パースとAI Search索引の作成.ipynb` | PDF のパース、チャンク化、共通のエンドポイントへの自分の索引の作成、ANN とハイブリッドの検索 | 30分 |
 | `1-2_Scratch_RAGエージェントの構築とデプロイ.ipynb` | エージェントの試作、MLflow のトレースと評価、Agent Bricks CLI でのデプロイ | 45分 |
 | `2_Managed_Genie AgentとContent Search.ipynb` | Genie Agent の作成と Agent mode での質問（画面操作のガイド） | 30分 |
 | `agent/` | Agent Bricks のプロジェクト（1-2 でデプロイする） | — |
@@ -43,7 +44,17 @@ flowchart LR
 - 参加者に **Workspace access** と **Databricks SQL access** の entitlement がある
 - サーバーレスのノートブック（環境バージョン 4 で動作確認）、サーバーレスの SQL ウェアハウス
 - Foundation Model API の `databricks-qwen3-embedding-0-6b`（埋め込み）と、Claude などの LLM
-- カタログの `USE CATALOG` と `CREATE SCHEMA`、AI Search エンドポイントと Databricks Apps を作る権限
+- 参加者：カタログの `USE CATALOG` と `CREATE SCHEMA`、Databricks Apps を作る権限
+- 代表者：AI Search エンドポイントを作る権限。参加者は共通のエンドポイントの「使用可能」（CAN USE）の権限をもらう（00-0 で付ける）
+
+## 共有するものと参加者ごとのもの
+
+| もの | 単位 | 作る人 |
+|---|---|---|
+| カタログ | 全員で共有してよい | 管理者 |
+| AI Search エンドポイント | **全員で1つ**（索引は1つのエンドポイントに 50 まで） | 代表者（00-0） |
+| スキーマ（ボリューム・テーブル・索引） | **参加者ごと**。既定は `rag_handson_<ユーザー名>` | 参加者（00、1-1） |
+| エージェントのアプリ | 参加者ごと（`AGENT_NAME` を重ならない名前にする） | 参加者（1-2） |
 
 ## ノートブックのインポート（Git フォルダー）
 
@@ -57,8 +68,9 @@ flowchart LR
 
 ## 実行順
 
-1. `00_データ準備` — widget の `CATALOG_NAME` を自分のカタログにする
-2. `1-1_Scratch_...` — 同じカタログ・スキーマを指定する
+0. （代表者だけ）`00-0_代表者_共通エンドポイントの作成` — ハンズオンの10分以上前に実行し、エンドポイントの名前を参加者に伝える
+1. `00_データ準備` — widget の `CATALOG_NAME` を使うカタログにする。`SCHEMA_NAME` は自動で自分用の名前になる
+2. `1-1_Scratch_...` — 00 と同じカタログ・スキーマを指定し、`AI_SEARCH_ENDPOINT` に代表者から伝えられた名前を入れる
 3. `1-2_Scratch_...` — `AGENT_NAME` は参加者ごとに重ならない名前にする。デプロイは Web Terminal で行う
 4. `2_Managed_...` — 画面の操作でGenie Agent を作る
 5. （任意）`apps/rag-handson-switcher` — 1-2 と 2 で作ったエージェントを切り替えて比べる
@@ -76,7 +88,7 @@ flowchart LR
 cd apps/rag-handson-switcher
 npm install
 databricks bundle deploy -p <プロファイル> \
-  --var ai_search_index=<カタログ>.rag_handson.docs_chunks_index \
+  --var ai_search_index=<カタログ>.<自分のスキーマ>.docs_chunks_index \
   --var genie_agent_id=<Genie Agent の ID>
 databricks bundle run app -p <プロファイル>
 ```
@@ -85,16 +97,16 @@ Genie Agent の ID は、Genie Agent の URL の `/genie/rooms/` の後ろの値
 
 ## 後片付け
 
-作ったものを、作った順と逆に消す。
+作ったものを、作った順と逆に消す。共通のエンドポイントは、**全員が終わってから代表者が最後に** 消す。
 
 | 対象 | 消し方 |
 |---|---|
 | 切り替えアプリ | `databricks bundle destroy -p <プロファイル>`（`apps/rag-handson-switcher` で実行） |
 | Scratch のエージェント | Web Terminal で `agentbricks deployments delete agent-bricks-<AGENT_NAME> --delete-source` |
 | Genie Agent | Genie の一覧で該当の Genie Agent を削除する |
-| AI Search の索引とエンドポイント | 索引はスキーマと一緒に消える。エンドポイントは「コンピュート」→「AI Search」で削除する（ほかの索引がないことを確かめる） |
 | MLflow エクスペリメント | 「エクスペリメント」で `rag-handson-agent` を削除する |
-| スキーマ（テーブル・ボリューム・索引） | 中身を確かめてから `DROP SCHEMA <カタログ>.rag_handson CASCADE` |
+| 自分のスキーマ（テーブル・ボリューム・索引） | 中身を確かめてから `DROP SCHEMA <カタログ>.<自分のスキーマ> CASCADE`。索引もスキーマと一緒に消える |
+| （代表者）共通の AI Search エンドポイント | 全員がスキーマを消したあと、00-0 の「後片付け」のセルで削除する |
 
 ## サンプルデータ
 
